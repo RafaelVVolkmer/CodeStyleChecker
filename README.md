@@ -73,6 +73,24 @@ chmod +x checker.sh
 ./checker.sh --rebuild-only
 ```
 
+### Local Use
+
+```bash
+# Show help message and exit
+./checker.sh -h
+./checker.sh --help
+
+# Enable verbose output for more build/check details
+./checker.sh -v allman main.c
+./checker.sh --verbose kr src/
+
+# Run the checker and output results as pretty JSON
+./checker.sh -j allman main.c
+./checker.sh --json kr src/
+```
+
+---
+
 # - CLI UI View
 
 <p align="center">
