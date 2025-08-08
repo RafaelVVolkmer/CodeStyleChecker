@@ -113,7 +113,7 @@ chmod +x checker.sh
 ### Docker Use
 
 ```bash
-# The script will automatically build the Docker image (using --load) and mount the necessary volumes
+# The script will automatically build the Docker image and mount the necessary volumes
 ./checker.sh --docker allman main.c          # normal output
 ./checker.sh --docker -j kr src/             # writes JSON to ./out
 ```
