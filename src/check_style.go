@@ -1534,9 +1534,21 @@ func checkConsecutiveBlankLines(
     errCount *[]int,
     errs *[]StyleError,
 ) {
-    if strings.TrimSpace(lines[i]) == "" {
-        (*errCount)[i] = (*errCount)[i-1] + 1
-        if (*errCount)[i] > 1 {
+    if i < 0 || i >= len(lines) || errCount == nil || errs == nil || *errCount == nil {
+        return
+    }
+
+    line := strings.TrimSpace(strings.TrimRight(lines[i], "\r"))
+    isBlank := (line == "")
+
+    if isBlank {
+        prev := 0
+        if i > 0 {
+            prev = (*errCount)[i-1]
+        }
+        (*errCount)[i] = prev + 1
+
+        if (*errCount)[i] >= 2 {
             *errs = append(*errs, StyleError{
                 LineNum: i + 1,
                 Start:   0,
