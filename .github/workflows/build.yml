@@ -1,0 +1,53 @@
+name: C Style Check
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "File or directory to check"
+        required: false
+        default: "."
+
+jobs:
+  style-check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        style: [ kr, allman ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.x'
+
+      - name: Make checker executable
+        run: chmod +x ./checker.sh
+
+      - name: Run checker (JSON)
+        id: json
+        continue-on-error: true
+        env:
+          TARGET: ${{ github.event.inputs.target || '.' }}
+        run: |
+          ./checker.sh -j ${{ matrix.style }} "$TARGET" || true
+
+      - name: Upload JSON artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: errors-${{ matrix.style }}
+          path: out/errors_${{ matrix.style }}_*.json
+          if-no-files-found: ignore
+
+      - name: Enforce style (fails on errors)
+        env:
+          TARGET: ${{ github.event.inputs.target || '.' }}
+        run: |
+          ./checker.sh ${{ matrix.style }} "$TARGET"
