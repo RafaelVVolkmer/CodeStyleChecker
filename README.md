@@ -120,6 +120,8 @@ chmod +x checker.sh
 ./checker.sh --docker -j kr src/             # writes JSON to ./out
 ```
 
+<p align="right">(<a href="#readme-top">Back to Top</a>)</p>
+
 ---
 
 # - Tech Stack and Environment Settings
