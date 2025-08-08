@@ -4,6 +4,13 @@ set -euo pipefail
 VERBOSE=0
 REBUILD_ONLY=0
 JSON_OUTPUT=0
+DOCKER_MODE=0
+DOCKER_IMAGE="codestylechecker"
+
+IN_CONTAINER=0
+if [[ -x "/app/bin/check_style" ]]; then
+  IN_CONTAINER=1
+fi
 
 print_usage() {
   cat <<EOF
@@ -14,6 +21,7 @@ Options:
   -v, --verbose         Enable verbose output
   -r, --rebuild-only    Only (re)build the Go binary; do not run checks
   -j, --json            Emit pretty JSON of each error (written to ./out/errors_<style>_<date>_<time>.json)
+  --docker              Run the analysis inside a Docker container (mounting the target file/dir into /work)
 EOF
 }
 
@@ -24,39 +32,73 @@ while [[ $# -gt 0 && "$1" == -* ]]; do
     -v|--verbose)      VERBOSE=1; shift ;;
     -r|--rebuild-only) REBUILD_ONLY=1; shift ;;
     -j|--json)         JSON_OUTPUT=1; shift ;;
+    --docker)          DOCKER_MODE=1; shift ;;
     --)                shift; break ;;
     *) echo "Unknown option: $1" >&2; print_usage; exit 1 ;;
   esac
 done
 
-if [[ $# -eq 2 ]]; then
-  STYLE="$1"; TARGET="$2"
-elif [[ $# -eq 3 ]]; then
-  STYLE="$1"; TARGET="$2/$3"
-else
+if [[ $# -lt 2 ]]; then
   echo "Error: expected style + file_or_directory" >&2
-  print_usage; exit 1
+  print_usage
+  exit 1
 fi
+
+STYLE="$1"; TARGET="$2"
 
 if [[ "$STYLE" != "kr" && "$STYLE" != "allman" ]]; then
   echo "Error: style must be 'kr' or 'allman'" >&2
   exit 1
 fi
 
-command -v go >/dev/null || { echo "Error: Go not found." >&2; exit 1; }
+# ----------------------- Docker mode (host) -----------------------
+if (( DOCKER_MODE )) && (( IN_CONTAINER == 0 )); then
+  if ! docker image inspect "$DOCKER_IMAGE" >/dev/null 2>&1; then
+    echo "[INFO] Docker image '$DOCKER_IMAGE' not found. Building..."
+    docker build --load -t "$DOCKER_IMAGE" --build-arg UID=$(id -u) --build-arg GID=$(id -g) .
+  fi
 
+  if command -v realpath >/dev/null 2>&1; then
+    TARGET_ABS="$(realpath "$TARGET")"
+  else
+    TARGET_ABS="$(readlink -f "$TARGET")"
+  fi
+
+  DOCKER_VOLUMES=(-v "$TARGET_ABS:/work:ro")
+  if (( JSON_OUTPUT )); then
+    mkdir -p out
+    DOCKER_VOLUMES+=(-v "$(pwd)/out:/app/out")
+  fi
+
+  CMD_ARGS=()
+  (( VERBOSE )) && CMD_ARGS+=("-v")
+  (( JSON_OUTPUT )) && CMD_ARGS+=("-j")
+
+  docker run --rm \
+    "${DOCKER_VOLUMES[@]}" \
+    "$DOCKER_IMAGE" \
+    "${CMD_ARGS[@]}" "$STYLE" "/work"
+
+  exit 0
+fi
+
+# ----------------------- Local/Container mode -----------------------
 SRC=./src/check_style.go
 BIN_DIR=./bin
 BIN="$BIN_DIR/check_style"
 
-mkdir -p "$BIN_DIR"
-
-if [[ $REBUILD_ONLY -eq 1 || ! -x "$BIN" || "$SRC" -nt "$BIN" ]]; then
-  (( VERBOSE )) && echo "Building checker..."
-  go build -o "$BIN" "$SRC"
-  [[ $REBUILD_ONLY -eq 1 ]] && exit 0
-elif (( VERBOSE )); then
-  echo "Using existing checker binary"
+if (( IN_CONTAINER )); then
+  BIN="/app/bin/check_style"
+else
+  command -v go >/dev/null || { echo "Error: Go not found." >&2; exit 1; }
+  mkdir -p "$BIN_DIR"
+  if [[ $REBUILD_ONLY -eq 1 || ! -x "$BIN" || "$SRC" -nt "$BIN" ]]; then
+    (( VERBOSE )) && echo "Building checker..."
+    go build -o "$BIN" "$SRC"
+    [[ $REBUILD_ONLY -eq 1 ]] && exit 0
+  elif (( VERBOSE )); then
+    echo "Using existing checker binary"
+  fi
 fi
 
 # ----------------------- Collect files -----------------------
