@@ -73,6 +73,23 @@ chmod +x checker.sh
 ./checker.sh --rebuild-only
 ```
 
+# - CLI UI View
+
+<p align="center">
+  <img src="readme/CLI.svg" alt="libmemalloc logo""/>
+</p>
+
+---
+
+The command-line interface presents style analysis results in a structured, readable format.
+Each reported issue begins with an incremental number and a severity label — either ERROR or WARNING — shown in uppercase and color-coded, with errors underlined in red and warnings in yellow.
+
+Directly below, the tool displays the file name, followed by its line and column in file.c:line:column format. The surrounding code is shown with line numbers on the left, a vertical separator, and the relevant token or symbol highlighted for quick identification.
+
+Messages describe the specific rule violation, such as missing newlines, uninitialized variables, or incorrect indentation, with details about the expected format (e.g., “found 2 spaces, expected 4”).
+
+At the end of the run, a summary line reports the total number of errors and warnings found, using consistent color cues to match the severities above. This approach makes it possible to quickly locate and address each issue without having to parse large amounts of plain text output.
+
 <p align="right">(<a href="#readme-top">Back to Top</a>)</p>
 
 ---
