@@ -1,0 +1,59 @@
+name: Docker Style Check
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        style: [ kr, allman ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect UID/GID & prepare out
+        run: |
+          echo "UID=$(id -u)" >> $GITHUB_ENV
+          echo "GID=$(id -g)" >> $GITHUB_ENV
+          mkdir -p out
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          tags: codestylechecker:ci
+          load: true
+          build-args: |
+            UID=${{ env.UID }}
+            GID=${{ env.GID }}
+
+      - name: Run checker in Docker (JSON)
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/work:ro" \
+            -v "${GITHUB_WORKSPACE}/out:/app/out" \
+            codestylechecker:ci -j ${{ matrix.style }} /work || true
+
+      - name: Upload JSON artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-json-${{ matrix.style }}
+          path: out/errors_${{ matrix.style }}_*.json
+          if-no-files-found: ignore
+
+      - name: Enforce style (fails on errors)
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/work:ro" \
+            codestylechecker:ci ${{ matrix.style }} /work
